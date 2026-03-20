@@ -5,13 +5,7 @@ const styles = ["Реализм", "Аниме", "Масло", "Акварель"
 const sizes = ["1:1", "16:9", "9:16", "4:3"];
 const qualities = ["Стандарт", "HD", "4K"];
 
-const mockImages = [
-  "https://picsum.photos/seed/neuro1/600/600",
-  "https://picsum.photos/seed/neuro2/600/600",
-  "https://picsum.photos/seed/neuro3/600/600",
-  "https://picsum.photos/seed/neuro4/600/600",
-  "https://picsum.photos/seed/neuro5/600/600",
-];
+const GENERATE_URL = "https://functions.poehali.dev/f3ab6b0e-cb3a-437f-b544-e61bc8b2adb3";
 
 export default function Generator() {
   const [prompt, setPrompt] = useState("");
@@ -22,6 +16,8 @@ export default function Generator() {
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [count, setCount] = useState(1);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [revisedPrompt, setRevisedPrompt] = useState<string | null>(null);
 
   const handleDownload = async () => {
     if (!generatedImage) return;
@@ -44,14 +40,36 @@ export default function Generator() {
     }
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!prompt.trim()) return;
     setIsGenerating(true);
     setGeneratedImage(null);
-    setTimeout(() => {
-      setGeneratedImage(mockImages[Math.floor(Math.random() * mockImages.length)]);
+    setErrorMsg(null);
+    setRevisedPrompt(null);
+
+    try {
+      const res = await fetch(GENERATE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt,
+          style: selectedStyle,
+          size: selectedSize,
+          quality: selectedQuality,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorMsg(data.error || "Ошибка генерации");
+      } else {
+        setGeneratedImage(data.url);
+        setRevisedPrompt(data.revised_prompt || null);
+      }
+    } catch {
+      setErrorMsg("Ошибка соединения. Попробуй ещё раз.");
+    } finally {
       setIsGenerating(false);
-    }, 2500);
+    }
   };
 
   return (
@@ -180,7 +198,11 @@ export default function Generator() {
                 <span className="font-display text-xs text-muted-foreground uppercase tracking-widest">Результат</span>
                 {generatedImage && (
                   <div className="flex gap-2">
-                    <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-muted hover:bg-border transition-colors text-xs text-white font-body">
+                    <button
+                      onClick={handleGenerate}
+                      disabled={isGenerating}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-muted hover:bg-border transition-colors text-xs text-white font-body"
+                    >
                       <Icon name="RefreshCw" size={12} />
                       Заново
                     </button>
@@ -202,8 +224,22 @@ export default function Generator() {
                     <div className="w-20 h-20 rounded-full border-2 border-neon-green border-t-transparent animate-spin mx-auto mb-4" />
                     <p className="font-display text-sm neon-green">Создаю шедевр...</p>
                     <p className="font-body text-xs text-muted-foreground mt-1">
-                      Стиль: {selectedStyle} · {selectedQuality}
+                      Стиль: {selectedStyle} · {selectedQuality} · ~20 сек
                     </p>
+                  </div>
+                ) : errorMsg ? (
+                  <div className="text-center">
+                    <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+                      <Icon name="AlertCircle" size={28} className="text-destructive" />
+                    </div>
+                    <p className="font-display text-sm text-destructive mb-2">Ошибка генерации</p>
+                    <p className="font-body text-xs text-muted-foreground max-w-xs">{errorMsg}</p>
+                    <button
+                      onClick={handleGenerate}
+                      className="mt-4 px-4 py-2 rounded-xl bg-muted text-white text-xs font-display hover:bg-border transition-colors"
+                    >
+                      Попробовать снова
+                    </button>
                   </div>
                 ) : generatedImage ? (
                   <div className="w-full animate-fade-in-scale">
@@ -217,6 +253,9 @@ export default function Generator() {
                       <span className="pill bg-muted text-muted-foreground">{selectedSize}</span>
                       <span className="pill bg-muted text-muted-foreground">{selectedQuality}</span>
                     </div>
+                    {revisedPrompt && (
+                      <p className="font-body text-xs text-muted-foreground mt-2 leading-relaxed opacity-60 line-clamp-2">{revisedPrompt}</p>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center opacity-40">
