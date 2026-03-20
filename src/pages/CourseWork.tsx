@@ -13,6 +13,11 @@ export default function CourseWork() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [done, setDone] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [docxBlob, setDocxBlob] = useState<Blob | null>(null);
+  const [docxFilename, setDocxFilename] = useState("Курсовая.docx");
+
+  const DOCX_URL = "https://functions.poehali.dev/bf420735-1946-4d25-a10a-7ced7a00464e";
 
   const toggleStructure = (item: string) => {
     setSelectedStructure(prev =>
@@ -20,24 +25,71 @@ export default function CourseWork() {
     );
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!topic.trim()) return;
     setIsGenerating(true);
     setDone(false);
+    setErrorMsg(null);
+    setDocxBlob(null);
     setProgress(0);
 
-    const steps = [10, 25, 45, 65, 80, 95, 100];
-    let i = 0;
-    const interval = setInterval(() => {
-      if (i < steps.length) {
-        setProgress(steps[i]);
-        i++;
+    // Анимируем прогресс-бар пока идёт запрос
+    const fakeSteps = [10, 25, 45, 65, 80, 92];
+    let fi = 0;
+    const fakeTimer = setInterval(() => {
+      if (fi < fakeSteps.length) {
+        setProgress(fakeSteps[fi]);
+        fi++;
+      }
+    }, 1200);
+
+    try {
+      const res = await fetch(DOCX_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic,
+          subject,
+          pages: selectedPages,
+          structure: selectedStructure,
+        }),
+      });
+
+      clearInterval(fakeTimer);
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setErrorMsg(data.error || "Ошибка генерации документа");
+        setProgress(0);
       } else {
-        clearInterval(interval);
-        setIsGenerating(false);
+        const blob = await res.blob();
+        const contentDisposition = res.headers.get("Content-Disposition") || "";
+        const match = contentDisposition.match(/filename="?([^"]+)"?/);
+        const filename = match ? decodeURIComponent(match[1]) : `Курсовая_${topic.slice(0, 30)}.docx`;
+        setDocxBlob(blob);
+        setDocxFilename(filename);
+        setProgress(100);
         setDone(true);
       }
-    }, 600);
+    } catch {
+      clearInterval(fakeTimer);
+      setErrorMsg("Ошибка соединения. Попробуй ещё раз.");
+      setProgress(0);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleDownload = () => {
+    if (!docxBlob) return;
+    const url = URL.createObjectURL(docxBlob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = docxFilename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const progressLabels = [
@@ -174,8 +226,11 @@ export default function CourseWork() {
             <div className="bg-card border border-border rounded-2xl overflow-hidden h-full min-h-[500px] flex flex-col">
               <div className="flex items-center justify-between p-4 border-b border-border">
                 <span className="font-display text-xs text-muted-foreground uppercase tracking-widest">Предпросмотр</span>
-                {done && (
-                  <button className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-neon-purple text-white hover:opacity-90 transition-opacity text-xs font-display font-bold glow-purple">
+                {done && docxBlob && (
+                  <button
+                    onClick={handleDownload}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-neon-purple text-white hover:opacity-90 transition-opacity text-xs font-display font-bold glow-purple"
+                  >
                     <Icon name="Download" size={12} />
                     СКАЧАТЬ WORD
                   </button>
@@ -194,6 +249,20 @@ export default function CourseWork() {
                       />
                     </div>
                     <p className="font-body text-xs text-muted-foreground">{progress}% завершено</p>
+                  </div>
+                ) : errorMsg ? (
+                  <div className="text-center">
+                    <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+                      <Icon name="AlertCircle" size={28} className="text-destructive" />
+                    </div>
+                    <p className="font-display text-sm text-destructive mb-2">Ошибка</p>
+                    <p className="font-body text-xs text-muted-foreground max-w-xs">{errorMsg}</p>
+                    <button
+                      onClick={handleGenerate}
+                      className="mt-4 px-4 py-2 rounded-xl bg-muted text-white text-xs font-display hover:bg-border transition-colors"
+                    >
+                      Попробовать снова
+                    </button>
                   </div>
                 ) : done ? (
                   <div className="w-full animate-fade-in-scale">

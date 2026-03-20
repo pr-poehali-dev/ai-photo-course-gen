@@ -1,0 +1,31 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Missing topic",
+      "method": "POST",
+      "path": "/",
+      "body": {},
+      "expectedStatus": 400,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Generate docx without AI",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "topic": "Тестовая тема курсовой работы",
+        "subject": "Экономика",
+        "pages": 30,
+        "structure": ["Введение", "Заключение", "Список литературы"]
+      },
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    }
+  ]
+}
