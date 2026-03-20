@@ -6,9 +6,11 @@ const sizes = ["1:1", "16:9", "9:16", "4:3"];
 const qualities = ["Стандарт", "HD", "4K"];
 
 const mockImages = [
-  "https://images.unsplash.com/photo-1686541988360-39b88a4ebb25?w=400&q=80",
-  "https://images.unsplash.com/photo-1682685797406-97f364419b4a?w=400&q=80",
-  "https://images.unsplash.com/photo-1684779847639-fbcc3c8b8a3a?w=400&q=80",
+  "https://picsum.photos/seed/neuro1/600/600",
+  "https://picsum.photos/seed/neuro2/600/600",
+  "https://picsum.photos/seed/neuro3/600/600",
+  "https://picsum.photos/seed/neuro4/600/600",
+  "https://picsum.photos/seed/neuro5/600/600",
 ];
 
 export default function Generator() {
@@ -19,6 +21,28 @@ export default function Generator() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [count, setCount] = useState(1);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    if (!generatedImage) return;
+    setIsDownloading(true);
+    try {
+      const response = await fetch(generatedImage);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "neuro-image.jpg";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      window.open(generatedImage, "_blank");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const handleGenerate = () => {
     if (!prompt.trim()) return;
@@ -160,14 +184,14 @@ export default function Generator() {
                       <Icon name="RefreshCw" size={12} />
                       Заново
                     </button>
-                    <a
-                      href={generatedImage}
-                      download="neuro-image.jpg"
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neon-green text-black hover:opacity-90 transition-opacity text-xs font-display font-bold"
+                    <button
+                      onClick={handleDownload}
+                      disabled={isDownloading}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neon-green text-black hover:opacity-90 transition-opacity text-xs font-display font-bold disabled:opacity-60"
                     >
-                      <Icon name="Download" size={12} />
-                      СКАЧАТЬ
-                    </a>
+                      <Icon name={isDownloading ? "Loader2" : "Download"} size={12} className={isDownloading ? "animate-spin" : ""} />
+                      {isDownloading ? "..." : "СКАЧАТЬ"}
+                    </button>
                   </div>
                 )}
               </div>
